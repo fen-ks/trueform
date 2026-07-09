@@ -4,7 +4,31 @@
 
 Most "humanizer" tools are a single hidden prompt behind a paywall. `trueform` is different by design: it's free, runs on your own API key (pennies per document) or fully local via [Ollama]($0), and its quality comes from its **architecture**, not a copy-pasteable prompt.
 
-> Status: **v0.1** — working CLI with a single, well-engineered rewrite pass, provider-agnostic backend, and content protection. Multi-pass pipeline, local scoring, and style-learning are on the roadmap below.
+> Status: **v0.5** — multi-pass humanization loop, local scoring, explainability reports, `doctor` setup checker, and a local web UI. Style-learning and semantic fidelity guard are on the roadmap.
+
+---
+
+## Quick start (free, no API key)
+
+```powershell
+cd trueform
+$env:PYTHONPATH="src"
+
+# Check your setup
+python -m trueform doctor
+
+# Score text
+python -m trueform score --file examples/sample.txt --report
+
+# Humanize (offline mock — for testing)
+python -m trueform humanize --provider mock --file examples/sample.txt
+
+# Web UI in your browser
+python -m trueform serve
+# open http://127.0.0.1:8765
+```
+
+For **real rewrites at $0**, install [Ollama](docs/ollama-setup.md) and use `--provider ollama`.
 
 ---
 
@@ -27,16 +51,16 @@ AI text gets flagged and *feels* robotic for two measurable reasons:
 
 ### On the roadmap (the real differentiators)
 
-- **Multi-pass pipeline** — analyze → rewrite → self-verify → refine, instead of one blind pass.
-- **Local perplexity/burstiness scoring** — measure human-likeness offline (GPT-2 proxy), no paid detector API.
-- **Style learning** — feed it a few paragraphs you've written; it rewrites toward *your* voice.
-- **Semantic fidelity guard** — embedding check that your meaning didn't drift.
-- **Explainability report** — see *why* text looked AI-generated and what changed.
+- [x] **Multi-pass pipeline** — rewrite → score → refine until target is met
+- [x] **Local human-likeness scoring** — measure offline, no paid detector API
+- [x] **Explainability report** — see *why* text looked AI-generated
+- [ ] **Style learning** — feed it a few paragraphs you've written; it rewrites toward *your* voice
+- [ ] **Semantic fidelity guard** — embedding check that your meaning didn't drift
 
 ## Install
 
 ```bash
-git clone https://github.com/your-username/trueform
+git clone https://github.com/fen-ks/trueform
 cd trueform
 pip install -e ".[dev]"
 ```
@@ -102,9 +126,9 @@ ruff check .
 ## Roadmap
 
 - [x] v0.1 — CLI, provider abstraction, single-pass rewrite, content protection, CI
-- [ ] v0.5 — multi-pass pipeline, local perplexity/burstiness scoring, style learning, fidelity guard
-- [ ] v1.0 — web UI (diff view, aggressiveness slider), explainability report, docs
-- [ ] v1.x — browser extension, PyPI release, offline Ollama presets
+- [x] v0.5 — multi-pass pipeline, local scoring, explainability report, doctor, web UI
+- [ ] v1.0 — style learning, semantic fidelity guard, polished docs
+- [ ] v1.x — browser extension, PyPI release
 
 ## License
 

@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>trueform</title>
+  <style>
+    :root {
+      --bg: #0f1419;
+      --panel: #1a2332;
+      --text: #e7ecf3;
+      --muted: #8b9cb3;
+      --accent: #3dd68c;
+      --border: #2a3649;
+      --warn: #f0b429;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: "Segoe UI", system-ui, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.5;
+    }
+    header {
+      padding: 1.25rem 1.5rem;
+      border-bottom: 1px solid var(--border);
+    }
+    header h1 { margin: 0; font-size: 1.35rem; }
+    header p { margin: 0.35rem 0 0; color: var(--muted); font-size: 0.9rem; }
+    main { max-width: 1100px; margin: 0 auto; padding: 1.25rem; }
+    .controls {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+      gap: 0.75rem;
+      margin-bottom: 1rem;
+    }
+    label { display: block; font-size: 0.8rem; color: var(--muted); margin-bottom: 0.25rem; }
+    select, input, button, textarea {
+      width: 100%;
+      font: inherit;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      background: var(--panel);
+      color: var(--text);
+      padding: 0.55rem 0.65rem;
+    }
+    textarea { min-height: 180px; resize: vertical; }
+    .actions { display: flex; gap: 0.75rem; flex-wrap: wrap; margin: 1rem 0; }
+    button {
+      width: auto;
+      cursor: pointer;
+      font-weight: 600;
+    }
+    button.primary { background: var(--accent); color: #0b1410; border-color: transparent; }
+    button:disabled { opacity: 0.5; cursor: not-allowed; }
+    .grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1rem;
+    }
+    @media (max-width: 800px) { .grid { grid-template-columns: 1fr; } }
+    .panel {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 1rem;
+    }
+    .panel h2 { margin: 0 0 0.75rem; font-size: 0.95rem; color: var(--muted); }
+    .output {
+      white-space: pre-wrap;
+      min-height: 160px;
+      font-size: 0.95rem;
+    }
+    .score-bar {
+      margin-top: 1rem;
+      padding: 0.85rem 1rem;
+      border-radius: 8px;
+      background: #121a24;
+      border: 1px solid var(--border);
+      font-size: 0.9rem;
+    }
+    .score-bar strong { color: var(--accent); }
+    .status { color: var(--muted); font-size: 0.85rem; min-height: 1.2rem; }
+    .error { color: #ff7b7b; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>trueform</h1>
+    <p>Open-source text humanizer — paste AI draft, score it, rewrite until it sounds human.</p>
+  </header>
+  <main>
+    <div class="controls">
+      <div>
+        <label for="provider">Provider</label>
+        <select id="provider">
+          <option value="mock">mock (free, offline)</option>
+          <option value="ollama">ollama (free, local)</option>
+        </select>
+      </div>
+      <div>
+        <label for="tone">Tone</label>
+        <select id="tone">
+          <option value="natural">natural</option>
+          <option value="casual">casual</option>
+          <option value="professional">professional</option>
+          <option value="academic">academic</option>
+          <option value="personal">personal</option>
+        </select>
+      </div>
+      <div>
+        <label for="strength">Strength</label>
+        <select id="strength">
+          <option value="light">light</option>
+          <option value="medium" selected>medium</option>
+          <option value="heavy">heavy</option>
+        </select>
+      </div>
+      <div>
+        <label for="target">Target score</label>
+        <input id="target" type="number" min="0" max="100" value="70" />
+      </div>
+    </div>
+
+    <label for="input">Your text</label>
+    <textarea id="input" placeholder="Paste stiff or AI-written text here..."></textarea>
+
+    <div class="actions">
+      <button type="button" id="scoreBtn">Score only</button>
+      <button type="button" id="humanizeBtn" class="primary">Humanize</button>
+    </div>
+
+    <p class="status" id="status"></p>
+
+    <div class="grid">
+      <div class="panel">
+        <h2>Before</h2>
+        <div class="output" id="beforeOut"></div>
+      </div>
+      <div class="panel">
+        <h2>After</h2>
+        <div class="output" id="afterOut"></div>
+      </div>
+    </div>
+
+    <div class="score-bar" id="scoreBar">Score: —</div>
+  </main>
+
+  <script>
+    const input = document.getElementById("input");
+    const status = document.getElementById("status");
+    const beforeOut = document.getElementById("beforeOut");
+    const afterOut = document.getElementById("afterOut");
+    const scoreBar = document.getElementById("scoreBar");
+
+    function setBusy(busy, msg = "") {
+      document.getElementById("scoreBtn").disabled = busy;
+      document.getElementById("humanizeBtn").disabled = busy;
+      status.textContent = msg;
+      status.className = "status";
+    }
+
+    function setError(msg) {
+      status.textContent = msg;
+      status.className = "status error";
+    }
+
+    async function post(path, body) {
+      const res = await fetch(path, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Request failed");
+      return data;
+    }
+
+    document.getElementById("scoreBtn").addEventListener("click", async () => {
+      const text = input.value.trim();
+      if (!text) return setError("Paste some text first.");
+      setBusy(true, "Scoring...");
+      try {
+        const data = await post("/api/score", { text });
+        beforeOut.textContent = text;
+        afterOut.textContent = "—";
+        scoreBar.innerHTML = `Score: <strong>${data.score.overall}</strong> / 100` +
+          ` (burstiness ${data.score.burstiness}, phrasing ${data.score.phrasing})`;
+        setBusy(false, "Done.");
+      } catch (e) {
+        setBusy(false);
+        setError(e.message);
+      }
+    });
+
+    document.getElementById("humanizeBtn").addEventListener("click", async () => {
+      const text = input.value.trim();
+      if (!text) return setError("Paste some text first.");
+      setBusy(true, "Humanizing (may take a minute with Ollama)...");
+      try {
+        const data = await post("/api/humanize", {
+          text,
+          provider: document.getElementById("provider").value,
+          tone: document.getElementById("tone").value,
+          strength: document.getElementById("strength").value,
+          target_score: Number(document.getElementById("target").value),
+        });
+        beforeOut.textContent = text;
+        afterOut.textContent = data.text;
+        const b = data.scores.before.overall;
+        const a = data.scores.after.overall;
+        scoreBar.innerHTML = `Score: <strong>${b}</strong> → <strong>${a}</strong> / 100` +
+          ` (${data.scores.pass_count} pass${data.scores.pass_count === 1 ? "" : "es"})`;
+        setBusy(false, data.notes.join(" ") || "Done.");
+      } catch (e) {
+        setBusy(false);
+        setError(e.message);
+      }
+    });
+  </script>
+</body>
+</html>
