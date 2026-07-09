@@ -15,12 +15,13 @@ import sys
 from pathlib import Path
 
 from trueform.config import HumanizeConfig, Strength, Tone
+from trueform.doctor import format_doctor_report, run_doctor
 from trueform.pipeline.humanizer import Humanizer
 from trueform.pipeline.report import format_csv, format_report
 from trueform.pipeline.scoring import score_text
 from trueform.providers import ProviderError
 
-_SUBCOMMANDS = frozenset({"humanize", "score"})
+_SUBCOMMANDS = frozenset({"humanize", "score", "doctor", "serve"})
 
 
 def _eprint(msg: str) -> None:
@@ -123,6 +124,12 @@ def build_parser() -> argparse.ArgumentParser:
         help="Print raw numbers as JSON instead of CSV.",
     )
 
+    sub.add_parser("doctor", help="Check your setup (Python, Ollama, mock provider).")
+
+    serve = sub.add_parser("serve", help="Start the local web UI in your browser.")
+    serve.add_argument("--host", default="127.0.0.1", help="Host to bind (default: 127.0.0.1).")
+    serve.add_argument("--port", type=int, default=8765, help="Port (default: 8765).")
+
     return p
 
 
@@ -208,6 +215,14 @@ def main(argv: list[str] | None = None) -> int:
 
     if args.command == "score":
         return _run_score(args)
+    if args.command == "doctor":
+        print(format_doctor_report(run_doctor()))
+        return 0
+    if args.command == "serve":
+        from trueform.web.server import serve
+
+        serve(host=args.host, port=args.port)
+        return 0
 
     return _run_humanize(args)
 
