@@ -56,6 +56,12 @@ class HumanizeConfig:
     # Free-form extra guidance appended to the system prompt.
     extra_instructions: str | None = None
 
-    # Reserved for later phases (multi-pass, style profiles); kept here so the
-    # public config shape is stable across versions.
+    # Multi-pass loop: rewrite, score, refine until target is met or max_passes.
+    max_passes: int = 3
+    target_score: float = 70.0
+    # Stop early when a pass improves overall by less than this (saves API calls).
+    min_improvement: float = 1.0
+
+    # Reserved for later phases (style profiles); kept here so the public config
+    # shape is stable across versions.
     style_profile: dict | None = field(default=None, repr=False)

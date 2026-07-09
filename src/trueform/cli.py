@@ -63,6 +63,25 @@ def _add_humanize_args(p: argparse.ArgumentParser) -> None:
     p.add_argument("--temperature", type=float, default=0.9, help="Sampling temperature.")
     p.add_argument("-i", "--instructions", help="Extra guidance for the rewrite.")
     p.add_argument("-q", "--quiet", action="store_true", help="Print only the result text.")
+    p.add_argument(
+        "--max-passes",
+        type=int,
+        default=3,
+        metavar="N",
+        help="Rewrite up to N times until the target score is met (default: 3).",
+    )
+    p.add_argument(
+        "--target-score",
+        type=float,
+        default=70.0,
+        metavar="SCORE",
+        help="Stop when human-likeness reaches this 0-100 score (default: 70).",
+    )
+    p.add_argument(
+        "--single-pass",
+        action="store_true",
+        help="Disable the multi-pass loop (same as --max-passes 1).",
+    )
 
 
 def _normalize_argv(argv: list[str]) -> list[str]:
@@ -119,11 +138,18 @@ def _run_humanize(args: argparse.Namespace) -> int:
         base_url=args.base_url,
         temperature=args.temperature,
         extra_instructions=args.instructions,
+        max_passes=1 if args.single_pass else args.max_passes,
+        target_score=args.target_score,
     )
 
     try:
         if not args.quiet:
-            _eprint(f"Humanizing with {args.provider or 'auto'} ...")
+            passes = config.max_passes
+            _eprint(
+                f"Humanizing with {args.provider or 'auto'} "
+                f"(up to {passes} pass{'es' if passes != 1 else ''}, "
+                f"target {config.target_score}) ..."
+            )
         result = Humanizer(config).run(source)
     except ProviderError as e:
         _eprint(f"Provider error: {e}")
@@ -139,6 +165,12 @@ def _run_humanize(args: argparse.Namespace) -> int:
         return 0
 
     if not args.quiet:
+        before = result.scores.get("before", {}).get("overall", "?")
+        after = result.scores.get("after", {}).get("overall", "?")
+        passes = result.scores.get("pass_count", 1)
+        _eprint(f"Score: {before} -> {after} ({passes} pass{'es' if passes != 1 else ''})")
+        for note in result.notes:
+            _eprint(f"  {note}")
         _eprint("--- humanized ---")
     print(result.text)
     return 0

@@ -19,6 +19,18 @@ _REPLACEMENTS = {
     "cannot": "can't",
 }
 
+# Applied on refine passes (when the prompt mentions human-likeness score).
+_REFINE_REPLACEMENTS = {
+    "In today's fast-paced world,": "These days,",
+    "In today's fast-paced world": "These days",
+    "it is important to note that": "",
+    "important to note that": "",
+    "leverage": "use",
+    "increasingly prevalent": "common now",
+    "plays a crucial role": "matters",
+    "not only": "",
+}
+
 
 class MockProvider(Provider):
     name = "mock"
@@ -37,4 +49,12 @@ class MockProvider(Provider):
             text = user_prompt.split(marker, 1)[1]
         for src, dst in _REPLACEMENTS.items():
             text = text.replace(src, dst)
+
+        if "human-likeness" in user_prompt.lower() or "refine the following" in user_prompt.lower():
+            for src, dst in _REFINE_REPLACEMENTS.items():
+                text = text.replace(src, dst)
+            # Add burstiness: prepend a short sentence if the draft is still stiff.
+            if not text.startswith("Honestly"):
+                text = "Honestly? " + text[0].lower() + text[1:] if len(text) > 1 else text
+
         return text.strip()
